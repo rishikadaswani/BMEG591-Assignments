@@ -1,0 +1,455 @@
+---
+title: "BMEG 400E: Assignment 1"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Assignment Overview
+
+For this assignment we will be using data from a Chromatin Immunoprecipitation sequencing (ChIP-seq) produced by Choi, Won-Young, et al., (2020). *https://pubmed.ncbi.nlm.nih.gov/33293480/*. This data is part of a series of experiments that aimed to understand the chromatin changes that happen when an induced Pluripotent Stem Cell (iPSC) undergo differentiation towards a Neuronal Progenitor Cell (NPC). The **fastqc** files from this experiment have been pre-downloaded and added to the server, under the following path: **/projects/bmeg/A1/**. The datasets that we will be using for the assignment are in a shared *reading only* location that you can read but ARE NOT allowed to alter. 
+
+This assignment has 3 main goals: 
+
+  1. Get familiar with the server
+  
+  2. Manage a conda environment
+  
+  3. Perform an alignment against the human genome
+  
+  4. Cleaning your folder and uploading your assignment to Github
+
+In the future, we will use these assignment Rmd files for R code. For now, we're using an Rmd file but without any R code just to keep things consistent. You can include bash code here too.
+
+IMPORTANT: Every time you see *#?#* represents a blank you need to complete; the answer to a question we have asked you. Complete them with a command, code, or a written explanation (e.g. interpretation of the data) as appropriate.  Please make sure to answer all prompts, as this is how your assignment will be graded. 
+
+
+## 1. Getting Familiar with the Server
+
+For our course we will be using a server based on a Docker/Linux system. This will be the place where you will do your assignments and project. There are several things that you need to be aware while working on the server. The server has limited storage and computer power. Therefore, you will be required to be mindful of the processes you run as well as the files you keep. In general, files that are uncompressed (e.g. fastq, sam) should either be compressed or deleted (more on that later) to ensure we don't run out of space. If we do run out of space, no one will be able to write new data to disk, which will halt all progress until space clears up.
+
+### I think you can skip this next part
+
+We used to have to use the VPN to access this server. I tried just now without and it seemed to connect just fine. Using the VPN anyway will not hurt anything, so feel free to do this step if you like. Please let us know if you find that you cannot connect without it.
+
+To join the server you will need to be on an active connection of a UBC Virtual Private Network (VPN). If you do not have one already, you can check how to install it here: *https://it.ubc.ca/services/email-voice-internet/myvpn/setup-documents*. Once the VPN has been set, you will need to open a terminal. 
+
+  - **Windows system:** 
+      a. Install a terminal emulator like Putty (*https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html*). 
+      b. This will allow you to do a SSH connection using the server's IP (orca1.bcgsc.ca) and your credentials. 
+  
+  - **Linux/Unix system (Apple computer and Ubuntu):** 
+      a. Open a terminal
+      b. Type the following command: ssh username@orca1.bcgsc.ca 
+      c. When prompted, type your password to complete the login 
+      
+    
+Now that you have successfully joined the server, let's get you used to some basic commands
+
+### a. Check a directory's path 
+
+When using terminal, paths represent the addresses of the files and directories on the system. You can use paths to access files and move between directories. Once you have logged into the server you will be in your *home directory*. Below, you will be asked for commands and their output but without being told what commands to use. Make sure you understand the question and use Google or a linux/bash tutorial to help answer the questions. You can also get more information about a program by either typing `man <program>` or `<program> -h` (sometimes -h is -? --? --h --help -help), where `<program>` is the program you want to learn more about.
+
+```{bash, eval=FALSE}
+#?# Check your current directory's path: 0.5 pt
+
+/home/rdaswani_bmeg23
+
+```
+
+
+### b. Creating a directory 
+
+```{bash, eval=FALSE}
+
+#?# In your home directory create a new directory for assignment 1 (on some systems these are known as "folders") - 1pt
+## This directory will host the files created throughout this assignment 
+
+mkdir Assignment1
+
+```
+
+*Note:* Generally speaking, is good to follow a consistent naming convention when using the terminal. Remember: 
+
+  - Do not start a name with a number
+
+  - Names are case sensitive (ASSIGNMENT1.txt and assignment1.txt are not the same)
+
+  - Avoid to use spaces, as they are interpreted as special characters by the computer
+
+  - Use _ or - to replace spaces
+
+  - File extensions are meaningful for us to know the file format but generally have no effect on the file's function in linux, unlike in Windows where a .docx extension, for example, tells the operating system to open the file in Word. In linux, generally you specify what program to use yourself and so you can make the extension anything you want. e.g. you could rename your .fastq file to .oogabooga and it would work the same (although some programs check to make sure that the extension is correct and so might complain about it, but you can just name it back).
+  
+  
+
+### c. Moving within directories
+
+Access your newly created directory
+
+```{bash, eval=FALSE}
+#?# Type the command you need to use to move to your newly created directory - 0.5 pt 
+## Tip: look at the *cd* command documentation
+
+cd Assignment1
+
+```
+
+
+How would you move back to your home directory (*/home/your_user_name*)?
+
+```{bash, eval=FALSE}
+
+#hint: Check the tutorial: https://www.computerhope.com/unix/ucd.htm 
+
+#?# Using the complete directory path of your home directory: - 0.25 pt
+cd /home/rdaswani_bmeg23
+#?# Using the "go to parent directory" shortcut - 0.25
+cd .. 
+
+```
+
+
+### d. Explore the dataset 
+
+The sequencing data that we will be using is paired-end. This means that each DNA fragment has been sequenced twice, one from each end. Both are read in the 5' to 3' direction but read 2 is in the reverse complement orientation relative to read 1. Choose **one** of the reads files (1 or 2) for the following exercises.
+
+
+```{bash, eval=FALSE}
+
+#?# Look at the first 3 rows of the dataset - 0.25
+# Tip: look at the *head* command documentation 
+
+CCACAGCCATGCCTCCAAGGGTCCTTGATCCAAATAGCAGAACAAATCACATAAACTCTCAGGGCCTACTTTAGAAAGGCATGTGACTTGAGTTTCTGTATCGACTGTTCCTCTTGTCCAGAGGCCTTAATTAATCCAGGAATGGCGGCAT
+
+#?# Look at the last 7 rows of the dataset - 0.25
+# Tip: look at the *tail* command documentation 
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+
+#?# Explore the file with the *less* command  - 0.25
+less input_iPSC_SRA66_subset_1.fastq
+
+```
+
+Typically, fastq files would be compressed, typically using `gzip`.
+
+```{bash, eval=FALSE}
+
+#?# Compress one of the fastq files (from its original location) as a .fastq.gz within your assignment directory using gzip - 0.5
+cd home/rdaswani_bmeg23/Assignment1
+gzip < /projects/bmeg/A1/input_iPSC_SRA66_subset_1.fastq >input_iPSC_SRA66_subset_1.fastq.gz
+
+#?# Try running `zmore <file>.fastq.gz` on the file you just made. What does this command do? - 0.5
+Allows for examination of compressed file one screenful at a time 
+#?# How much space do the compressed and uncompressed fastqs take? - 0.5
+compressed - 159MB
+uncompressed - 823MB
+
+```
+
+
+
+### e. Piping 
+
+Because this is a very large dataset we will subset it in order to make it more manageable in size. This is just for the purposes of the assignment. Typically, you would use the whole file for your genomic analysis. As always, include both commands and the output.
+
+```{bash, eval=FALSE}
+
+#?# How many lines does the uncompressed fastq file have in total? - 0.25
+#Tip: loop at the *wc* command documentation
+wc -l /projects/bmeg/A1/input_iPSC_SRA66_subset_1.fastq
+
+10459640 lines 
+
+
+#?# Select only the id lines (e.g. @SRR12506919.667552 667552 length=151) of the dataset (the ones that start with @ and are followed by the read id) - 0.75 pt
+## Tip: look at the *grep* command
+grep "^@SRR" input_iPSC_SRA66_subset_1.fastq > reads_id.txt
+
+#?# How many reads are in the file (i.e., how many id lines are in the file)? - 1 pt
+2614910
+
+```
+
+
+### f. Saving an output 
+
+
+```{bash, eval=FALSE}
+
+#?# Create a file that contains only the reads id lines (the result of our previous exercise). - 0.5 pt
+grep "^@SRR" input_iPSC_SRA66_subset_1.fastq > reads_id.txt
+
+```
+
+
+### g. Creating a backup 
+
+There will be times where you will want to save a copy of a dataset or file before modifying in case something goes wrong. For those cases, you can create a copy of any file or directory using the "copy" command
+
+```{bash, eval=FALSE}
+
+#?# Create a copy of the reads ids file - 0.25 pt
+## Tip: man cp 
+
+cp reads_id.txt /home/rdaswani_bmeg23/Assignment1
+
+#?# Change the name of the backup reads id file - 0.25 pt
+## Tip: man mv
+
+cp reads_id.txt /home/rdaswani_bmeg23/Assignment1/reads_id_copy.txt
+
+#?# Delete the copy of the reads id file - 0.25 pt
+rm reads_id_copy.txt
+```
+
+## 2. Managing Conda Environments
+
+
+### a. Installing conda 
+
+Conda is a package and environment manager (*https://docs.conda.io/en/latest/*). It helps to create different virtual environments where you can have several packages installed to meet different needs. 
+
+```{bash, eval=FALSE}
+
+## 1. Move to your home directory 
+cd /home/rdaswani_bmeg23
+#?# 2. Use the wget command to get the following file: https://repo.anaconda.com/archive/Anaconda3-2022.10-Linux-x86_64.sh
+
+wget https://repo.anaconda.com/archive/Anaconda3-2022.10-Linux-x86_64.sh
+
+## The file extension .sh pertains to a bash script, the script you just downloaded contains all the instructions needed to install Conda to your home directory
+#?# 3. Run the Anaconda3-2021.11-Linux-x86_64.sh bash script. IMPORTANT: say yes to all the steps when prompted! 
+
+
+
+## 4. To finalize the installation you need to log out your current session and log in back to the server
+
+
+
+```
+
+
+### b. Create a conda environment
+
+In order to run the reads alignments against the human genome, there are a few tools that we will need:
+
+  - fastQC (*https://www.bioinformatics.babraham.ac.uk/projects/fastqc/*): comprehensive quality control measures of sequencing data.
+  
+  - bowtie2 (*http://bowtie-bio.sourceforge.net/bowtie2/index.shtml*): alignments of sequencing data. 
+  
+  - samtools (*http://www.htslib.org/doc/samtools.html*): set of tools to manage sam/bam alignment files 
+  
+  - htop & screen: bash system tools to visualize the server capacity and to run commands in the background, respectively. 
+  
+  
+To install them, we will be making use of the conda environments. Conda allows you to create and manage environments for any programming language. Managing this environments mean that you can work with specific versions of different programs at any given moment, simply by loading the desired environment. You can find more information about this resource here: *https://docs.conda.io/en/latest/* . 
+
+```{bash, eval=FALSE}
+#?# Create a new conda environment: - 0.5 pt
+# Tip: Consult the previously provide links or consult the conda create help (conda create --help)
+
+conda create -n myenv_a1 python=3.8
+```
+
+
+### b. Add programs to your conda environment
+
+Now that the environment has been created, it's time to add the packages that we will need. Conda has an active community and a great documentation (*https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html*) which you can use throughout the course to help answer any questions you may have. Googling "<tool> conda package" is a great way to find the tools you need. They often lie on different repositories, including bioconda.
+
+
+```{bash, eval=FALSE}
+
+#?# Add htop, screen, fastQC, samtools, and bowtie2 to your conda environment: - 3 pt
+conda install -c bioconda fastqc
+conda install -c bioconda samtools 
+conda install -c conda-forge htop
+conda install -c conda-forge screen
+conda install -c bioconda bowtie2
+
+```
+
+
+## 3. Performing Alignments 
+
+### a. Data quality check
+
+We will use fastQC to do a quick inspection of the data quality. Once it has run, it will give you an html report of the quality of the data that you can open using a web browser. More information on how to read the output can be found here: *https://dnacore.missouri.edu/PDF/FastQC_Manual.pdf* and in the tool's website.
+
+  
+```{bash, eval=FALSE}
+
+#?# Run fastQC on the fastq files: - 1pt
+In my home directory: 
+
+fastqc *.fastq
+
+## In order to open the html files on your web browser you will need to download the files to your computer
+## Ubuntu/Linux and Mac users: look at the *scp* command
+## Windows users, this varies by what program you are using to connect (e.g. putty, winSCP, MobaXTerm). E.g. see: https://stackoverflow.com/questions/6217055/how-can-i-copy-a-file-from-a-remote-server-to-using-putty-in-windows
+
+scp rdaswani_bmeg23@orca1.bcgsc.ca:/home/rdaswani_bmeg23/Assignment1/input_iPSC_SRA66_subset_1_fastqc.html ~/Desktop/BMEG591E
+
+scp rdaswani_bmeg23@orca1.bcgsc.ca:/home/rdaswani_bmeg23/Assignment1/input_iPSC_SRA66_subset_2_fastqc.html ~/Desktop/BMEG591E
+
+#?# What can you say about the data quality? Are there any areas of concern? If so, what could explain what you are seeing? Does read 1 or read 2 have better sequencing quality? Is this expected? - 4 pt 
+# Read 1 has better sequencing quality compared to read 2 which is expected as read 2 is often worse quality than read 1 as signals get mixed. We can deduce the quality from the per sequence quality scores.In both read 1 and read 2 there is a warning for the per sequence GC content, which means the sum of the deviations from the normal distributions represents more than 15% of the reads. 
+
+```
+  
+  
+### b. Running a process on the background: screen 
+
+The processes that we are about to run can take a long time to finish. Thus, we will make use of the *screen* tool, which allows you to run a process in the background while continue using your server session without the risk of ending the process due to a bad internet connection, accidentally closing the tab, or other random circumstances. 
+
+```{bash, eval=FALSE}
+
+## To run a process in a background screen with screen you:
+
+# 1. Run the following command: 
+script /dev/null
+
+# 2. Activate your conda environment 
+conda activae myenv_a1
+
+# 3. Start a background process with a specific name 
+screen -S background_screen_name 
+screen -S screen_a1
+
+# 4. Run the process and any commands you wish, for example:
+wc -l /projects/bmeg/A1/input_iPSC_SRA66_subset_1.fastq
+
+# 5. Get out of the background screen, you will need to type the following:
+ctrl + A + D 
+
+# 6. Return to the background screen to check the process
+screen -r background_screen_name
+screen -r screen_a1
+
+# 7. Terminate the background screen once the process has ended
+# Within the background screen type:
+exit 
+
+```
+
+
+### c. Checking the server capacity and your current runs: htop
+
+Another way to check on the progress of your runs and the server status is with the `htop` command. This will open a screen showing all the processes that are currently being run on the server. Our server has 40 CPU cores, shown at the top, illustrating how much of the node is currently in use. Always make sure to check the processes that are being run before sending yours.
+
+```{bash, eval=FALSE}
+
+#?# Use the htop command to describe the status of the server - 1.5 pt
+#In the top left, we see the memory tab which denotes the memory being consumed by the process running on the server. Most of the lines are yellow, denoting cache pages, and shows 22.2G/126G. The load average iillustrates the average computational work, the first number is 0.06 which is a minute average, the second is 0.04 which is a 5 minute average and the third is 0.05 which is a 15 minute average. There are 23 tasks, 0 thr, 0 kthr and 1 running. The VIRT which is the virtual memory being consumed by the process is 23764. The %CPU is 0.7 and %MEM is 0.0. 
+
+```
+
+
+
+### d. Genome indexing - bowtie2
+
+Now, we will need to create an index of the human genome that bowtie2 will use to map our sequences in the genome. In order to do this, you will need to use the previously downloaded files of the human genome with the desired build (e.g. hg19,hg38), you can find those files within the server here: */projects/bmeg/indexes/*
+
+**BEFORE RUNNING ANYTHING**: go to the "Other resources" section at the end of the assignment!
+
+
+```{bash, eval=FALSE}
+
+## Something useful to do when using a new software is to look at the documentation using the *help* option
+## Try running: 
+bowtie2 -h 
+
+
+
+#?# Write a command that will build a bowtie2 index from the hg38 genome sequence using the fasta file containing the human genome sequence (/projects/bmeg/indexes/hg38/hg38.fa) - 1.5 pt
+## Tip: look into the bowtie2-build help (bowtie2-build --help) 
+## Indexes take a lot of computational resources and time to run. The one we need for the human genome will take around 3 hours to be done, and so you do not need to actually run it to completion. Just include the command.
+bowtie2-build -f hg38.fa
+
+```
+
+### e. Alignment
+
+We are working with paired-end data. Thus, you will need to make sure to use both fastq files to align the sequences to the genome.
+**IMPORTANT:** Run with *default parameters* to the extent possible. DO NOT specify any non-essential paramaters.
+
+**Time flag**: This step will take up to 30 mins 
+
+```{bash, eval=FALSE}
+
+#?# Perform a paired-end alignment of the fastq sequences provided (located here: /projects/bmeg/A1/) to the human genome index build (located here: /projects/bmeg/indexes/hg38/ ) - 2pt
+
+## Tip: look at the bowtie2 --help or the documentation on the tool website (http://bowtie-bio.sourceforge.net/bowtie2/manual.shtml#getting-started-with-bowtie-2-lambda-phage-example)
+
+bowtie2 -x /projects/bmeg/indexes/hg38/hg38_bowtie2_index -1 /projects/bmeg/A1/input_iPSC_SRA66_subset_1.fastq -2 /projects/bmeg/A1/input_iPSC_SRA66_subset_2.fastq -S assignment1_align.sam
+
+```
+
+
+### f. Viewing the alignments
+
+Now, we will make use of **samtools** to review some basic features of the alignment. For mor information about this tool: *http://www.htslib.org/doc/*
+
+```{bash, eval=FALSE}
+
+## Use *samtools view* to get the:
+## Tip: check out the different flag (-f and -F) options
+## Tip: Read the samtools view --help, read carefully for an option that allows you to *count* the results of your search
+
+#?# Number of mapped reads - 1 pt
+samtools view -c -F 260 assignment1_align.sam
+
+5195744
+
+#?# Number of unmapped reads - 1 pt
+samtools view -c -f 5 assignment1_align.sam
+
+34076
+
+```
+
+
+## 4. Cleaning and Uploading
+
+### a. Cleaning your folders
+
+Before signing off, we need to make sure that we don't leave behind any big files that can take up a lot of memory from our server. This is important as if we run out of disk space, others will be unable to complete their work. 
+  
+** If we run out of disk space, we will see who is using up space unnecessarily and deduct marks from them in proportion to the space wasted. **
+  
+To do clean up, make sure to:
+
+  a. Delete any copies of the input assignment files you might have your personal folder
+
+  b. Zip or delete all the unneeded files created for the assignment. 
+
+
+### b. Uploading to Github
+
+  1. Make sure to create a Github account of your own. 
+
+  2. Once you have set it up, create a new private repository for the course. 
+
+  3. Use the "upload file" option to upload your assignment Rmd to the website. 
+
+  4. Upload the link of your github repository where the assignment file is located onto Canvas
+  
+  5. Share with GitHub users @Carldeboer and @BMEGGenoInfo
+
+
+
+
+# Authors and contributions
+
+Following completion of your assignment, please fill out this section with the authors and their contributions to the assignment.  If you worked alone, only the author (e.g. your name and student ID) should be included.
+
+Authors: Rishika Daswani (59028654) and Name2 (studentID2)
+
+Contributions: (example) N1 and N2 worked together on the same computer to complete the assignment. N1 typed for the first half and N2 typed for the second half. 
