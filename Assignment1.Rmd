@@ -404,12 +404,12 @@ Now, we will make use of **samtools** to review some basic features of the align
 ## Tip: Read the samtools view --help, read carefully for an option that allows you to *count* the results of your search
 
 #?# Number of mapped reads - 1 pt
-samtools view -c -F 260 assignment1_align.sam
+samtools view -c -F 4 assignment1_align.sam
 
 5195744
 
 #?# Number of unmapped reads - 1 pt
-samtools view -c -f 5 assignment1_align.sam
+samtools view -c -f 4 assignment1_align.sam
 
 34076
 
