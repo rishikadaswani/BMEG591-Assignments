@@ -251,9 +251,10 @@ Successful knitting to github_document - 2 pts
 
 Following completion of your assignment, please fill out this section with the authors and their contributions to the assignment.  If you worked alone, only the author (e.g. your name and student ID) should be included.
 
-Authors: Rishika Daswani (59028654) 
+Authors: Rishika Daswani (59028654) Stephanie Besoiu (12184982)
 
-Contributions: (example) N1 and N2 worked together on the same computer to complete the assignment. N1 typed for the first half and N2 typed for the second half. 
+Contributions: Rishika and Stephanie worked together for the pipeline section of the assignment.
+
 
 
 

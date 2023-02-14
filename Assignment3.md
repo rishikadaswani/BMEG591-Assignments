@@ -308,8 +308,6 @@ with the authors and their contributions to the assignment. If you
 worked alone, only the author (e.g. your name and student ID) should be
 included.
 
-Authors: Rishika Daswani (59028654)
+Authors: Rishika Daswani (59028654) and Stephanie Besoiu (12184982)
 
-Contributions: (example) N1 and N2 worked together on the same computer
-to complete the assignment. N1 typed for the first half and N2 typed for
-the second half.
+Contributions: Rishika and Stephanie worked together for the pipeline section of the assignment.
