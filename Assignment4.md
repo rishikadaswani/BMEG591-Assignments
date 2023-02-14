@@ -499,8 +499,10 @@ library(dplyr)
 
 ``` r
 startposition.df <- subset(merged_data.df, chr_hg19 == chr_hg38)
+filtered_startposition.df <- startposition.df %>% filter(chr_hg19 %in% c('chr1', 'chr2', 'chr3', 'chr4', 'chr5', 'chr6', 'chr7', 'chr8', 'chr9', 'chr10', 'chr11', 'chr12', 'chr13', 'chr14', 'chr15', 'chr16', 'chr17', 'chr18', 'chr19', 'chr20', 'chr22', 'chr23', 'chrX', 'chrY'))
+filtered_startposition.df <- startposition.df %>% filter(chr_hg38 %in% c('chr1', 'chr2', 'chr3', 'chr4', 'chr5', 'chr6', 'chr7', 'chr8', 'chr9', 'chr10', 'chr11', 'chr12', 'chr13', 'chr14', 'chr15', 'chr16', 'chr17', 'chr18', 'chr19', 'chr20', 'chr22', 'chr23', 'chrX', 'chrY'))
 library(ggplot2)
-ggplot(startposition.df, aes(x = start_hg38, y = start_hg19)) + geom_point() + facet_wrap(vars(chr_hg19))
+ggplot(filtered_startposition.df, aes(x = start_hg38, y = start_hg19)) + geom_point() + facet_wrap(vars(chr_hg19))
 ```
 
 ![](Assignment4_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
@@ -509,7 +511,7 @@ ggplot(startposition.df, aes(x = start_hg38, y = start_hg19)) + geom_point() + f
 ## Generate the same plot using the end positions instead of the start positions. 
 #?# Type the modified command you used below - 1 pt
 
-ggplot(startposition.df, aes(x = end_hg38, y = end_hg19)) + geom_point() + facet_wrap(vars(chr_hg19))
+ggplot(filtered_startposition.df, aes(x = end_hg38, y = end_hg19)) + geom_point() + facet_wrap(vars(chr_hg19))
 ```
 
 ![](Assignment4_files/figure-gfm/unnamed-chunk-7-2.png)<!-- -->
@@ -721,9 +723,14 @@ sum(merged_nonDet.df$mapped_diff)/nrow(merged_nonDet.df)*100
 ## Plots each chromosome in its own subplot (panel) (e.g. see facet_wrap())
 ## Plots only cases where both reads mapped to the same chromosome
 #?# Type the command you used below: - 2 pt
+library(dplyr)
 merged_nonDet_subset.df <- subset(merged_nonDet.df, chr_nonDet == chr_ori)
+
+filtered_merged_nonDet_subset.df <- merged_nonDet_subset.df %>% filter(chr_nonDet %in% c('chr1', 'chr2', 'chr3', 'chr4', 'chr5', 'chr6', 'chr7', 'chr8', 'chr9', 'chr10', 'chr11', 'chr12', 'chr13', 'chr14', 'chr15', 'chr16', 'chr17', 'chr18', 'chr19', 'chr20', 'chr22', 'chr23', 'chrX', 'chrY'))
+filtered_merged_nonDet_subset.df <- merged_nonDet_subset.df %>% filter(chr_ori %in% c('chr1', 'chr2', 'chr3', 'chr4', 'chr5', 'chr6', 'chr7', 'chr8', 'chr9', 'chr10', 'chr11', 'chr12', 'chr13', 'chr14', 'chr15', 'chr16', 'chr17', 'chr18', 'chr19', 'chr20', 'chr22', 'chr23', 'chrX', 'chrY'))
+
 library(ggplot2)
-ggplot(merged_nonDet_subset.df, aes(x = start_ori, y = start_nonDet)) + geom_point() + facet_wrap(vars(chr_nonDet)) 
+ggplot(filtered_merged_nonDet_subset.df, aes(x = start_ori, y = start_nonDet)) + geom_point() + facet_wrap(vars(chr_nonDet)) 
 ```
 
 ![](Assignment4_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
