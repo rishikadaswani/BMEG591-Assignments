@@ -1,0 +1,606 @@
+---
+title: "Assignment 4: Mappability continues"
+output:
+  github_document:
+    toc: true
+    toc_depth: 4
+---
+
+# Assignment Overview
+
+The goal of this assignment is to get you acquainted with how the different ways to analyze a file can change the results of the reads' alignment against the reference genome. We will be using only one file: **SRR12506919_subset.fastq.gz**, that can be found under the following path: **/projects/bmeg/A4/**. It will be divided into two parts: 
+
+Part 1: Analyzing different genome builds 
+
+Part 2: Ambiguity in reads mapping
+
+# Important remarks 
+
+ - Remember to be as clear as possible with your answers.
+
+ - Please make sure to explain your thought process behind your code and answers. 
+
+ - If you have used methods suggested on forums, websites, make sure to cite them.
+
+ - If you have not been able to find the answer to a bug with reasonable effort, please ask on Piazza! We are here to help, the assignments should be a safe environment for you to try new things and learn. 
+ 
+
+## 0. Getting ready
+
+As always, before we get started we will install the tools required for the assignment. This time, we only need to add: 
+
+  - LiftOver (https://genome.sph.umich.edu/wiki/LiftOver). These is a package designed to change files from a specific coordinates system (i.e., genome build) to another. 
+  
+  - bedtools (https://bedtools.readthedocs.io/en/latest/). It's a powerful tool to compare genomic positions. 
+
+```{bash, eval=FALSE}
+
+#?# Add liftOver to your conda environment created on A1, type the command you used below - 1 pt
+conda install -c bioconda ucsc-liftover 
+#?# Add bedtools to your conda environment created on A1, type the command you used below - 1 pt
+conda install -c bioconda bedtools 
+## Your supervisor has been asking you to keep track of your environment when you run certain analyses. You can export your conda environment to a yml file by replacing MyEnv with the name of your environment in the following line:
+# conda activate MyEnv
+# conda env export > MyEnv.yml
+conda activate myenv_a1
+conda env export > myenv_a1.yml
+#?# Copy the contents of your yml file below - 1 pt
+name: myenv_a1
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1=conda_forge
+  - _openmp_mutex=4.5=2_kmp_llvm
+  - bedtools=2.30.0=h7d7f7ad_2
+  - bowtie2=2.4.1=py38he513fc3_0
+  - bzip2=1.0.8=h7b6447c_0
+  - c-ares=1.18.1=h7f8727e_0
+  - ca-certificates=2023.01.10=h06a4308_0
+  - certifi=2022.12.7=py38h06a4308_0
+  - curl=7.87.0=h5eee18b_0
+  - dbus=1.13.18=hb2f20db_0
+  - expat=2.4.9=h6a678d5_0
+  - fastqc=0.11.9=hdfd78af_1
+  - font-ttf-dejavu-sans-mono=2.37=hd3eb1b0_0
+  - fontconfig=2.14.1=h52c9d5c_1
+  - freetype=2.12.1=h4a9f257_0
+  - gdbm=1.18=hd4cb3f1_4
+  - glib=2.69.1=he621ea3_2
+  - htop=3.2.1=h0f457ee_0
+  - icu=58.2=he6710b0_3
+  - krb5=1.19.4=h568e23c_0
+  - ld_impl_linux-64=2.38=h1181459_1
+  - libcurl=7.87.0=h91b91d3_0
+  - libedit=3.1.20221030=h5eee18b_0
+  - libev=4.33=h7f8727e_1
+  - libffi=3.4.2=h6a678d5_6
+  - libgcc=7.2.0=h69d50b8_2
+  - libgcc-ng=12.2.0=h65d4601_19
+  - libnghttp2=1.46.0=hce63b2e_0
+  - libnl=3.7.0=h166bdaf_0
+  - libpng=1.6.37=hbc83047_0
+  - libssh2=1.10.0=h8f2d780_0
+  - libstdcxx-ng=11.2.0=h1234567_1
+  - libuuid=1.41.5=h5eee18b_0
+  - libxcb=1.15=h7f8727e_0
+  - libxml2=2.9.14=h74e7548_0
+  - llvm-openmp=14.0.6=h9e868ea_0
+  - mysql-connector-c=6.1.6=2
+  - ncurses=6.3=h5eee18b_3
+  - openjdk=11.0.13=h87a67e3_0
+  - openssl=1.1.1s=h0b41bf4_1
+  - pcre=8.45=h295c915_0
+  - perl=5.34.0=h5eee18b_2
+  - pip=22.3.1=py38h06a4308_0
+  - python=3.8.16=h7a1cb2a_2
+  - readline=8.2=h5eee18b_0
+  - sambamba=0.6.6=2
+  - samtools=1.6=hb116620_7
+  - screen=4.8.0=he28a2e2_0
+  - setuptools=65.6.3=py38h06a4308_0
+  - sqlite=3.40.1=h5082296_0
+  - tbb=2020.3=hfd86e86_0
+  - tk=8.6.12=h1ccaba5_0
+  - trimmomatic=0.39=hdfd78af_2
+  - ucsc-liftover=357=0
+  - wheel=0.37.1=pyhd3eb1b0_0
+  - xz=5.2.10=h5eee18b_1
+  - zlib=1.2.13=h5eee18b_0
+prefix: /home/rdaswani_bmeg23/anaconda3/envs/myenv_a1
+```
+
+
+
+## 1. Differences between genome builds
+
+Your Professor informs you that the Information and Technology (IT) department was able to recover part of your data from the server. Unfortunately, they were not able to recover your pipelines or scripts. Since you were using a pre-made index of the reference genome, you don't remember which genome build you used to map your sequences (hg19 or hg38). You cannot decide if it would be a big deal to use different genome builds for different alignments, and at the end you could just make sure they are in the same genome build when you compare them, right? Thus, you decide to investigate how much difference it would make to use a different version to assess what varies when you align the same reads to different genome-builds.
+
+
+### a. SE alignment against hg38 and hg19 
+
+```{bash, eval=FALSE}
+
+## Pre-made indexes can be found here: 
+## hg19 index: /projects/bmeg/indexes/hg19_bowtie2_index
+## hg38 index: /projects/bmeg/indexes/hg38_bowtie2_index
+## Recall that this is the fastq to be used throughout: /projects/bmeg/A4/SRR12506919_subset.fastq.gz
+
+#?# Perform a single-end alignment using bowtie2 against the pre-made index of the hg19 genome build - 2 pt
+bowtie2 -x /projects/bmeg/indexes/hg19/hg19_bowtie2_index -U /projects/bmeg/A4/SRR12506919_subset.fastq.gz -S assignment4_SE_hg19.sam
+
+#?# Perform a single-end alignment using bowtie2 against the pre-made index of the hg38 genome build - 2 pt
+bowtie2 -x /projects/bmeg/indexes/hg38/hg38_bowtie2_index -U /projects/bmeg/A4/SRR12506919_subset.fastq.gz -S assignment4_SE_hg38.sam
+
+#?# Why are we performing a single-end alignment here? - 0.5 pt
+Because, we only have a single end read not a paired end sequencne and hence the output is only one file to run single end alignment with. 
+
+
+```
+
+
+### b. Making the files comparable
+
+Before you can start comparing the files, you realize you need to translate them to the same genomic coordinate system. If you don't do this and try to find mismatches between the files you will find a ton, but that wouldn't mean that the reads are mapping to different parts of the genome, just that the coordinates are different (e.g. if there is a 1 bp insertion in hg38 relative to hg19, every base after that insertion will have different coordinates). To convert hg19 to your favorite genome build (hg38) you need to do a total of three steps:
+ 
+ - Sam to Bam: Convert the alignment file (sam) to binary format (bam), this will facilitate the manipulaiton of the files and will decrease the disk space used substantially. 
+ 
+ - Bam to bed: Convert the bam alignment file to bed format, enabling the comparison of the genomic posisions where the reads mapped. 
+
+ - Change genomic coordinates: Use liftOver to change the alignment file made using the hg19 index to the hg38 coordinates of the genome.  
+ 
+
+```{bash, eval=FALSE}
+## Sam to Bam -------------
+#?# Convert the SE alignment performed against hg38  (hg38 alignment) to bam, type the command you used below -1 pt
+samtools view -b -h assignment4_SE_hg38.sam > assignment4_SE_hg38.bam
+#?# Convert the SE alignment performed against hg19 (hg19 alignment) to bam, type the command you used below -1 pt
+samtools view -b -h assignment4_SE_hg19.sam > assignment4_SE_hg19.bam
+## Bam to bed -------------
+## Tip: Look into the bedtools bamtobed command
+#?# Use bedtools to convert the hg38 alignment bam file to bed format, type the command you used below - 1 pt 
+bedtools bamtobed -i assignment4_SE_hg38.bam > assignment4_SE_hg38.bed
+#?# Use bedtools to convert the hg19 alignment bam file to bed format, type the command you used below - 1 pt 
+bedtools bamtobed -i assignment4_SE_hg19.bam > assignment4_SE_hg19.bed
+
+## Scripting ------------
+## You want to make this easier the next time you want to convert between indexes. You decide to write a bash script which will take in the name of a file and perform the above steps.It need not be set up to analyze batches of files, but it should be robust against failure. (How can you check to see if the conversion worked?)
+#?# Copy your bash script below. - 3 pt 
+set -e # this makes the whole script exit on any error.
+sample=$1
+logDir=MyLogDirectory4 # this is where all the files to keep track of progress will go.
+mkdir -p MyLogDirectory4 # make the directory where log files will go, if it doesn't exist already
+echo running pipeline for $sample 
+if [ ! -e $logDir/$sample.bamtobed.done ] #run this code only if $logDir/$sample.bam.done is missing
+then
+  echo Performing sam to bam #sam to bam conversion 
+  ls /home/rdaswani_bmeg23/Assignment4
+  samtools view -b -h $sample.sam > $sample.bam
+  echo $sample 
+  
+  touch $logDir/$sample.bam.done 
+else 
+  echo Already performed sam to bam conversion 
+  
+fi 
+
+if [ ! -e $logDir/$sample.bed.done ] #run this code only if $logDir/$sample.bed.done is missing
+then
+  echo Performing bam to bed #bam to bed conversion
+  bedtools bamtobed -i $sample.bam > $sample.bed
+  echo $sample 
+  
+  touch $logDir/$sample.bam.done 
+else 
+  echo Already performed bam to bed conversion 
+  
+fi 
+
+#in order to check if it worked, you can just used head to open the bed file and see if it follows the structure headings of the bed file. 
+
+## LiftOver --------------
+#?# Use liftOver to change the hg19 alignment bed file to the hg38 coordinate system, type the command(s) you used below - 2 pt
+## To do this, you will need the "chain file": /projects/bmeg/A4/hg19ToHg38.over.chain.gz
+## Tip: Look at the liftOver documentation! 
+liftOver assignment4_SE_hg19.bed hg19ToHg38.over.chain.gz hg19Tohg38.output.bed unlifted.bed
+
+
+```
+
+
+### c. Analyzing the differences
+
+Now that both alignments are on the same coordinate system, they are comparable and ready to be analyzed. What you really want to see is how individual reads mapped in the two genome builds. Did they map to the same place or different places? To answer this, you need to sort your bed files by read name so that you can identify which bed entries in each file correspond to the same original read. 
+
+```{bash, eval=FALSE}
+
+#?# Using bash commands to sort the transformed hg19 alignment file bed alignment file by read name, type the command you used below - 2 pt
+## Tip: Look at the sort command!
+sort -k4 hg19Tohg38.output.bed > hg19Tohg38.output.sorted.bed
+
+#?# Using bash commands, sort the hg38 bed alignment file by read name, type the command you used below - 2 pt
+## Tip: Look at the sort command!
+sort -k4 assignment4_SE_hg38.bed > assignment4_SE_hg38.sorted.bed
+
+```
+
+
+You were really happy to see a visual representation of your data the last time you talked to your advisor about mapping parameters. You decide to give it a try this time with your merged bed file to answer your two main questions:
+
+- How many reads are there per chromosome and does this differ between genome builds? 
+
+- Do the reads map to the same genome region?
+
+### d. Reads per chromosome
+
+Before you get started, you discover that a labmate of yours was comparing the number of reads per chromosome under different conditions and they created a function to make this process more robust (function is below). You are really happy that this seems like the perfect function to plot the diferent number of reads per chromosome in the different genome builds, but there is one problem. The bed files need to be merged into one, before you can use the function. Plus, you realize that the function is very poorly documented and your labmate is AWOL due to midterms, so there is no way he can explain you how the function works. Your Professor asks you to go through the function and document as much as possible so future people can use it too (also because she wants to make sure you know what you are doing). 
+
+First, merge the files!
+
+
+```{bash, eval=FALSE}
+
+
+## Merging the files: ---------------
+#?# Using the join command on bash, merge the two bed files, so they follow the following format: 
+## read_id  chr_hg19  start_hg19  end_hg19  strand_hg19 chr_hg38  start_hg38  end_hg38  strand_hg38 
+
+#?# Type the command you used to merge the files below - 2pt 
+join -1 4 -2 4 hg19Tohg38.output.sorted.bed assignment4_SE_hg38.sorted.bed > Assignment4_merged.bed
+#?# Use the tail command to view the last 6 rows of your merged file, copy the output below: - 2pt 
+tail -n 6 Assignment4_merged.bed
+SRR12506919.99992 chr17 8186111 8186262 42 - chr17 8186111 8186262 42 -
+SRR12506919.99993 chr21 36980819 36980970 42 + chr21 36980819 36980970 42 +
+SRR12506919.99994 chr10 132331671 132331822 40 + chr10 132331671 132331822 40 +
+SRR12506919.99996 chr19 49443685 49443836 42 - chr19 49443685 49443836 42 -
+SRR12506919.99997 chr16 73891237 73891388 42 + chr16 73891237 73891388 42 +
+SRR12506919.99998 chr12 6970964 6971115 42 + chr12 6970964 6971115 42 +
+# 
+# 
+# 
+
+#?# Could you have merged your files without sorting? Why/why not? - 1 pt 
+#No, it will not merge if you do not have it sorted. This is because, by default the join command joins by the first column, and if the column is not the same, it will not merge. Whichever rows are the same, it will merge those, but it won't do it for the others. Bash spits out an error stating that could not join because file is not sorted. 
+
+## Copy the merged bed file to your local computer for analysis
+scp rdaswani_bmeg23@orca1.bcgsc.ca:/home/rdaswani_bmeg23/Assignment4/Assignment4_merged.bed ~/Desktop/BMEG591-Assignments
+```
+
+Now that you have the files in the right order, you move your files to your local computer to work on your personal RStudio!
+
+```{r, eval=TRUE}
+
+
+#?# Load your merged bed file into R using the *read.csv* function and save it into a data.frame
+#?# Type the command you used below  - 1pt
+merged_data.df <- read.delim("Assignment4_merged.bed", sep=" ", header = FALSE)
+merged_data.df <- merged_data.df[, -5]#deleting the score column
+merged_data.df <- merged_data.df[, -9]#deleting the score column
+
+## Change the column names (as appropriate) of your merged bed data.frame to: 
+# read_id  chr_hg38  start_hg38  end_hg38  strand_hg38 chr_hg19  start_hg19  end_hg19  strand_hg19 
+#?# Type the command you used below: - 1 pt
+colnames(merged_data.df) <- c("read_id", "chr_hg19", "start_hg19", "end_hg19", "strand_hg19", "chr_hg38", "start_hg38", "end_hg38", "strand_hg38")
+
+## Load the reshape2 library, install it if you don't already have it! 
+## Tip: Use the "packages" tab on the left bottom screen 
+library(reshape2)
+
+#?# Go through the function line by line using your merged bed file and your chosen parameters, as if it weren't a function (e.g. set "merged_bed" to the data.frame containing your data, and run each line of the function (you will also need to set the parameters)). Explain in a concise way how each line is changing the data. Use functions like head and tail to visualize the data as it's changing. - 4 pt
+
+## reads.per.chr:
+# This function takes a merged bed file of two conditions A and B and gives a data.frame of 3 columns: Chr, variable (condition), value (how many reads per chromosome are when using that condition)
+
+
+## Parameters: 
+# merged_bed: refers to the bed file you created on the previous section
+# cols2compare=c(2,6): default is column 2 versus 6, which if you followed the format specified when you merged the files, they should correspond to the chromosome column of each read for the two conditions (e.g., hg38 and hg19)
+# type.a=c("hg38", "redo"): you should specify a string, that states what is condition A. Defaults are "hg38" and "redo"
+# type.b=c("hg19", "noDet"): you should specify a string, that states what is condition B. Defaults are "hg19" and "noDet"
+
+reads.per.chr <- function(merged_data.df, cols2compare=c(2,6), type.a=c("hg19", "redo"), type.b=c("hg38", "noDet")){
+  
+  ## Create canonical chromosomes array to filter out contigs and scaffolds for simplicity
+  canonical_chromosomes <- paste0("chr", 1:22)
+  #this line lists out all the chromosomes from Chr1 to Chr 22 and removes all the other chromosomes 
+#This line of the function is changing the data, by giving only the Chr column and sorting it numerically "chr1", "chr2" etc. 
+  
+  ## For column 1
+  cols2compare=c(2,6) #This line of code compares the two columns 2 and 6 
+  chr_subset <- merged_data.df[,c(cols2compare[1])]
+  table_chrs1 <- table(chr_subset)
+
+  ## For column 2
+  chr_subset <- merged_data.df[,c(cols2compare[2])]
+  table_chrs2 <- table(chr_subset)
+  
+  
+  compare.df <- data.frame(column1=table_chrs1[names(table_chrs1) %in% canonical_chromosomes],
+                           column2=table_chrs2[names(table_chrs2) %in% canonical_chromosomes])
+  
+  compare.df <- compare.df[,c(1,2,4)] # removes the second column of chromosome names 
+  type.a= "hg19"
+  type.b= "hg38"
+  colnames(compare.df) <- c("Chr",paste0(type.a, "_reads"), paste0(type.b, "_reads"))
+  
+  compare.df <- melt(compare.df) 
+  #this function puts the hg19 and hg38 reads into one columnn 
+  
+  return(compare.df)
+  
+}
+
+#?# Run the reads.per.chr on your genome builds merged bed (previously loaded), specify all the parameters following the instructions of the function, type the command used below: - 1.5 pt 
+
+reads.per.chr <- function(merged_data.df, cols2compare=c(2,6), type.a=c("hg19", "redo"), type.b=c("hg38", "noDet")){
+  
+  ## Create canonical chromosomes array to filter out contigs and scaffolds for simplicity
+  canonical_chromosomes <- paste0("chr", 1:22)
+  
+#This line of the function is changing the data, by giving only the Chr column and sorting it numerically "chr1", "chr2" etc. 
+  
+  ## For column 1
+  chr_subset <- merged_data.df[,c(cols2compare[1])]
+  table_chrs1 <- table(chr_subset)
+
+  ## For column 2
+  chr_subset <- merged_data.df[,c(cols2compare[2])]
+  table_chrs2 <- table(chr_subset)
+  
+  
+  compare.df <- data.frame(column1=table_chrs1[names(table_chrs1) %in% canonical_chromosomes],
+                           column2=table_chrs2[names(table_chrs2) %in% canonical_chromosomes])
+  
+  compare.df <- compare.df[,c(1,2,4)] # removes the second column of chromosome names 
+  colnames(compare.df) <- c("Chr",paste0(type.a, "_reads"), paste0(type.b, "_reads"))
+  
+  compare.df <- melt(compare.df) 
+  #this function puts the hg19 and hg38 reads into one columnn 
+  
+  return(compare.df)
+  
+}
+reads.per.chr.df <- reads.per.chr(merged_data.df, type.a = "hg19", type.b = "hg38")
+
+#?# How many reads were mapped to two different chromosomes? What percent of reads is this? Type the code and the answers for each below. - 2 pt
+merged_data.df$diff_chr <- ifelse(merged_data.df$chr_hg19 == merged_data.df$chr_hg38, 0,1)
+sum(merged_data.df$diff_chr)
+#29413
+sum(merged_data.df$diff_chr)/nrow(merged_data.df)*100
+#4.865022 %
+
+#?# Create a new column which shows the reads per chromosome as a percentage of ALL reads.
+reads.per.chr.df$rpc.percentage <- reads.per.chr.df$value/sum(reads.per.chr.df$value)*100
+
+
+## Using the output data.frame you got from running the reads.per.chr function on your merged bed, create a barplot that: 
+## Uses the Chr column for the x-axis
+## Uses the value (percentage of reads) column for the y-axis
+## Uses the variable (conditions, also known as different genome builds in this case) column to "fill in" the color 
+## Each build should have their own bar (next to each other), they shouldn't be stacked!!
+#?# Type the command you used below: - 1.5 pt
+library(ggplot2)
+ggplot(reads.per.chr.df, aes(x = Chr, y = rpc.percentage, fill = variable)) + geom_col(position = 'dodge') + scale_x_discrete(guide = guide_axis(n.dodge = 2))
+#?# Which chromosome has the biggest difference between reads? Which genome build had more reads for this chromosome? Answer below - 1 pt
+
+#Chromosome 21 has the biggest difference between the h19_reads and hg38_reads. Hg_38 build has more reads for this chromosome. 
+
+
+```
+
+
+
+
+### e. Reads position in the genome builds
+
+```{r, eval=TRUE}
+
+## Using the start position of the reads on both genome builds, create a scatterplot using ggplot2 that: 
+## Has the start in the hg38 genome build in the x-axis
+## Has the start in the hg19 genome build in the y-axis
+## Plot each chromosome in its own subplot (panel) (e.g. see facet_wrap())
+## Plot only cases where both reads mapped to the same chromosome
+#?# Type the command you used below: - 3 pt
+library(dplyr)
+startposition.df <- subset(merged_data.df, chr_hg19 == chr_hg38)
+library(ggplot2)
+ggplot(startposition.df, aes(x = start_hg38, y = start_hg19)) + geom_point() + facet_wrap(vars(chr_hg19))
+## Generate the same plot using the end positions instead of the start positions. 
+#?# Type the modified command you used below - 1 pt
+
+ggplot(startposition.df, aes(x = end_hg38, y = end_hg19)) + geom_point() + facet_wrap(vars(chr_hg19))
+#?# Is it important to consider whether the reads mapped to the same strand in the two genome builds? Why or why not? - 2 pt 
+#yes, it is important to consider whether the reads have been mapped to the same strand, because the directions are different in the strand 
+
+```
+
+
+
+## 2. Ambiguity in reads mapping
+
+You are glad that you have answered most of your burning questions about read mapping and identified some of the things that can go wrong. So, you decide to share your knowledge with your friend. They tell you that they ran the SE alignment following your instructions and were about to share their results, only to find that when repeating the alignment for the same file their results changed! They come to you to help them with your wisdom. Your vast experience leads you to believe that something must have happened when the alignment was performed. 
+
+### a. Redoing the hg38 alignment 
+
+```{bash, eval=FALSE}
+
+#?# Re-run the SE alignment that you performed on 1a against the hg38 genome build, use exactly the same parameters, just change the output name  - 0.5 pt
+bowtie2 -x /projects/bmeg/indexes/hg38/hg38_bowtie2_index -U /projects/bmeg/A4/SRR12506919_subset.fastq.gz -S assignment4_SE_hg38_new.sam
+
+
+#?# Use the bash script you wrote in 1b to convert your sam file to a bed file. Type the command you used below - 1 pt 
+./runTheseJobsSerially.sh ./pipeline4.sh tasklist.txt 
+#?# Sort the file by read name (same as you did on part 1, using column 4), type the command you used below - 1 pt
+sort -k4 assignment4_SE_hg38_new.sam.bed > assignment4_SE_hg38_new_sorted.sam.bed
+
+## In order to see what has changed between these bowtie2 runs by comparing to your first run in Part 1b, you decide to merge the new hg38 alignment file with the original:
+join -1 4 -2 4  assignment4_SE_hg38_new_sorted.sam.bed assignment4_SE_hg38.sorted.bed > merged_redo.bed  
+#?# Merge the "redo" bed file and the "original" hg38 alignment bed (from part 1b) using the join command, as in part 1d, this time follow this format: - 1 pt
+## read_id chr_redo  start_redo  end_redo  strand_redo chr_ori  start_ori  end_ori  strand_ori 
+## NOTE: Remember to save the output!
+
+
+## Copy the merged bed file to your local computer for analysis
+scp rdaswani_bmeg23@orca1.bcgsc.ca:/home/rdaswani_bmeg23/Assignment4/merged_redo.bed ~/Desktop/BMEG591-Assignments
+
+```
+
+
+### b. Analyzing the ambiguity
+
+Your last analysis on the differences between genome build turn out so well, that you want to do the same. You have prepared the files so they are in the same format as needed to run your labmate's *reads.per.chromosome* function, and are ready to see the graph.
+
+
+```{r, eval=TRUE}
+
+
+## As before, load your merged bed file into R using the *read.csv* function and save it into a data.frame
+## Change the column names of your merged bed data.frame to: 
+## read_id chr_ori  start_ori  end_ori  strand_ori chr_redo  start_redo  end_redo  strand_redo
+#?# Type the commands you used below: - 0.5 pt
+merged_redo.df <- read.delim("merged_redo.bed", sep=" ", header = FALSE)
+merged_redo.df <- merged_redo.df[, -5]#deleting the score column
+merged_redo.df <- merged_redo.df[, -9]
+
+
+colnames(merged_redo.df) <- c("read_id", "chr_redo", "start_redo", "end_redo", "strand_redo", "chr_ori", "start_ori", "end_ori", "strand_ori")
+
+#?# Run the reads.per.chr on your genome builds merged bed (previously loaded), specify all the parameters following the instructions of the function, type the command used below: - 1.5 pt 
+reads.per.chr.new.df <- reads.per.chr(merged_redo.df, type.a = "chr_redo", type.b = "chr_ori")
+head(reads.per.chr.new.df)
+#?# How many reads were mapped to two different chromosomes? What percent of reads is this? Type the code and the answers for each below. 2 pt
+
+merged_redo.df$chr_diff <- ifelse(merged_redo.df$chr_redo == merged_redo.df$chr_ori, 0,1)
+sum(merged_redo.df$chr_diff)
+sum(merged_redo.df$chr_diff)/nrow(merged_redo.df)*100
+#0
+
+#the number of reads that were mapped to two different chromosomes was zero because chr_redo and chr_ori are equal to each other in all cases. 
+
+## Using the output data.frame you got from running the reads.per.chr function on your merged bed, do a barplot that: 
+## Uses the Chr column for the x-axis
+## Uses the value (number of reads) column for the y-axis
+## Uses the variable (conditions, also known as different runs in this case) column to "fill in" the color 
+## Each condition must have their own bar, they shouldn't be stacked!!
+
+#?# Type the command you used below: - 1.5 pt
+library(ggplot2)
+ggplot(reads.per.chr.new.df, aes(x = Chr, y = value, fill = variable)) + geom_col(position = 'dodge') + scale_x_discrete(guide = guide_axis(n.dodge = 2))
+
+
+#?# Do you see differences among the number of reads per chromosome between the two runs? Answer yes or no - 0.5 pt
+#no, there are no differences between these two runs 
+
+```
+
+You are intrigued by the results of your graph and decide to go deeper into the alignment to get a better idea of where the reads mapped within the genome. 
+
+```{r, eval=TRUE}
+
+## Subtract the start position of the original bed from the start position of the redo for all the reads
+#?# Type the command used below: - 0.5 pt
+merged_redo.df$subtraction <- merged_redo.df$start_redo - merged_redo.df$start_ori
+
+## Use the *table* command to tabulate the results from the previous question. Ex. table(a-b)
+#?# Type the command you used below: - 0.5 pt
+table(merged_redo.df$subtraction)
+#?# What do you see? How many have a non zero difference in position start? - 0.5 pt
+#All samples have a zero difference 
+
+#?# Describe how would you expect a scatterplot comparing the start ends in both runs would look like - 0.5 pt
+## x-axis: original run
+## y-axis: re-run 
+#The scatter plot will be just one point, as all the differences are zero. 
+```
+
+
+
+### c. Non-deterministic seeds
+
+You are confused by your friend's results since you don't seem to have the same problem. You ask her for the command she used to run her alignment and you notice a key difference. She included the following flags: **--non-deterministic --seed 3** . You decide to explore what this command is doing and if it would change your data. 
+
+
+
+```{bash, eval=FALSE}
+
+#?# Re-run the SE alignment that you performed on 1a against the hg38 genome build, change the output name and add this parameter:* --non-deterministic --seed 3 * - 1 pt
+bowtie2 --non-deterministic --seed 3 -x /projects/bmeg/indexes/hg38/hg38_bowtie2_index -U /projects/bmeg/A4/SRR12506919_subset.fastq.gz -S assignment4_SE_hg38_nonDet.sam
+
+#?# Using the same approaches as before, convert the sam file to bed, sort the files by read name, and join with the "original" hg38 alignment bed (part 1b) using the join command, with this format: - 1 pt
+## read_id  chr_nonDet  start_nonDet  end_nonDet  strand_nonDet chr_ori  start_ori  end_ori  strand_ori  
+## NOTE: Remember to save the output!
+## Put the commands you used below:
+./runTheseJobsSerially.sh ./pipeline4.sh tasklist.txt #sam to bed conversion 
+
+sort -k4 assignment4_SE_hg38_nonDet.sam.bed > assignment4_SE_hg38_nonDet_sorted.sam.bed #sort by read name 
+
+join -1 4 -2 4  assignment4_SE_hg38_nonDet_sorted.sam.bed assignment4_SE_hg38.sorted.bed > merged_nonDet.bed #merge files 
+## Copy the merged bed file to your local computer for analysis
+scp rdaswani_bmeg23@orca1.bcgsc.ca:/home/rdaswani_bmeg23/Assignment4/merged_nonDet.bed ~/Desktop/BMEG591-Assignments
+```
+
+### d. Analyzing the changes
+
+
+```{r, eval=TRUE}
+
+## Load your merged bed file into R, and change the column names of your merged bed data.frame to: 
+## read_id  chr_ori  start_ori  end_ori  strand_ori chr_nonDet  start_nonDet  end_nonDet  strand_nonDet 
+#?# Type the command you used below: - 1 pt
+merged_nonDet.df <- read.delim("merged_nonDet.bed", sep=" ", header = FALSE)
+merged_nonDet.df <- merged_nonDet.df[, -5]#deleting the score column
+merged_nonDet.df <- merged_nonDet.df[, -9]#deleting the score column
+
+colnames(merged_nonDet.df) <- c("read_id", "chr_nonDet", "start_nonDet", "end_nonDet", "strand_nonDet", "chr_ori", "start_ori", "end_ori", "strand_ori")
+
+#?# How many reads were mapped to two different chromosomes? What percent of reads is this? Type the code and the answers for each below. 2 pt
+merged_nonDet.df$mapped_diff <- ifelse(merged_nonDet.df$chr_nonDet == merged_nonDet.df$chr_ori, 0,1)
+sum(merged_nonDet.df$mapped_diff)
+#22538
+
+sum(merged_nonDet.df$mapped_diff)/nrow(merged_nonDet.df)*100
+#3.70% 
+
+
+
+## Using the start position of the reads on both alignment runs do a scatterplot in ggplot that: 
+## Has the start in the hg38_original in the x-axis
+## Has the start in the hg38_nonDet build in the y-axis
+## Plots each chromosome in its own subplot (panel) (e.g. see facet_wrap())
+## Plots only cases where both reads mapped to the same chromosome
+#?# Type the command you used below: - 2 pt
+merged_nonDet_subset.df <- subset(merged_nonDet.df, chr_nonDet == chr_ori)
+library(ggplot2)
+ggplot(merged_nonDet_subset.df, aes(x = start_ori, y = start_nonDet)) + geom_point() + facet_wrap(vars(chr_nonDet)) 
+
+
+#?# Explain why this changes when you add the --non-deterministic --seed 3 flags. What are these flags doing? Why did you get the result you saw in 2b?- 2 pt
+## Tip: Look at the bowtie2 documentation!
+#When non-deterministic flag is added it Bowtie2 will re-initialize the random generator which means that it will not necessarily report the same alignment for two identical reads. In 2b, since we did not have this flag, it reported the same alignment for identical reads and hence there was no difference between the two files. 
+
+
+#?# How do the number of off-diagonal reads and reads mapping to different chromosomes compare between where we mapped to two different genome versions (and then lifted over), versus the use of non-deterministic alignment? What fraction of reads that you found aligned to different chromosomes when using hg19 vs hg38 result from the differences between these two versions? - 3 pts
+
+#when mapped to two different genome versions the percentage of reads mapped was 4.87% whereas with the non-deterministic alignment, the percentage of reads mapped were 3.70%. Showing that with non-deterministic alignment, there was a lower percentage of reads mapped compared to when mapped to two different genome versions.  
+
+#?# What do you think would have happened if we had used paired end reads for the hg19-vs-hg38 alignment? What about for the hg38-vs-non-deterministic-hg38 alignment? How would the reads mapping to different chromosomes and reads mapping to different locations have changed? - 3 pt
+#If we had used paired end reads for hg19 vs hg38 we would have gotten more reads mapping to different chromosomes and the read locations would have changed. With the hg38 vs non-deterministic-hg38, the number of reads would have changed but the locations would have not. 
+
+```
+
+
+Please knit your *Rmd* file to github_document (*md document*) and include both in your submission.
+
+Successful knitting to github_document - 2 pts
+
+# References 
+https://anaconda.org/bioconda/bedtools 
+https://anaconda.org/bioconda/ucsc-liftover 
+https://stackoverflow.com/questions/74305611/how-to-get-a-column-to-display-percentages-in-r
+
+# Authors and contributions
+
+Following completion of your assignment, please fill out this section with the authors and their contributions to the assignment.  If you worked alone, only the author (e.g. your name and student ID) should be included.
+
+Authors: Rishika Daswani (59028654) and Stephanie Besoiu (12184982)
