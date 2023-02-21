@@ -143,7 +143,7 @@ scp rdaswani_bmeg23@orca1.bcgsc.ca:/projects/bmeg/A5/hg38.blacklist.bed ~/Deskto
 
 ## 5. Look at the following region again (chr3:93,470,124-93,471,058). 
 #?# What can you say now about the similarities between the files at this region? In your own words, explain what a blacklisted region is and if you think this region should be excluded a ChIP-seq analysis. - 1.5 pt
-#Blacklisted regions within ChIP-seq data is essentially genomic regions that produce artifacts and noise, they represent un-annotated repeats in the genome. It should be excluded in order to reduce/eliminate background noise which can be misconstrued as changes in biological variation. 
+#Blacklisted regions within ChIP-seq data is essentially genomic regions that produce artifacts and noise, they represent un-annotated repeats in the genome. It should be excluded in order to reduce/eliminate background noise which can be misconstrued as changes in biological variation. Further, you would remove them in order to reduce the number of tests. If you remove blacklisted regions then you would not have to do tests such as the multiple correction test. 
 
 #?# Does it matter whether your bam files are mapped to the same genome build (hg19 vs hg38)? Why or why not? How could you confirm whether this is the case? - 1.5 pts
 #yes, it does matter. Reads mapped to one genome build are not interchangeable with reads mapped to another genome build. You can see that the genome build matters by loading two bigwig files you suspect might be on the different reference builds into IGV. You can confirm that its important that bam files are mapped to the same genome build because if not, the peaks are not going to make sense. 
