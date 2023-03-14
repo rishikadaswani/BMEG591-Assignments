@@ -1,0 +1,379 @@
+---
+title: 'Assignment 7: PGS'
+output:
+  github_document:
+    toc: true
+    toc_depth: 4
+---
+
+# Assignment Overview
+
+In this assignment we will learn about population stratification, imputation of genotypes, and using polygenic scores.  Polygenic scores (PGSs) can be useful for predicting disease susceptibility. In order to calculate PGSs, we need two things: GWAS summary statistics (including effect sizes), and genotypes. Most of the time, only a subset of a person's genotypes are actually measured (e.g. via SNP array), and so we must impute the rest using a matched population of fully genotyped individuals. This is the goal of Assignment 7.
+
+Throughout the assignment we will be using a Mini Cohort that has genetic data and some phenotypic variables, together with the 1000 Genomes Project samples. Both datasets are in bfile plink format, which encompasses 3 files: *.bim, .bed and .fam* all the files can be located under the following path: */projects/bmeg/A7*
+
+
+# Getting Ready 
+
+In this assignment, you will use the plink tool extensively. A plink tutorial can be found here: https://zzz.bwh.harvard.edu/plink/tutorial.shtml
+
+```{bash, eval=FALSE}
+
+## Install plink1.9 onto your A1 conda environment:
+conda install -c bioconda plink
+
+
+```
+
+
+# Genotyping Quality Control
+
+
+## General QC
+
+Before we can start working on the genetic data, we need to ensure that the quality is adequate. Thus, we are gonna check the following measuring for our MiniCohort:
+
+   1. **SNP call rate:** The call rate represents the percentage of participants with non-missing data for that SNP. Removing variants with a call rate lower than 95% avoids potential wrong calls to be included in further analysis
+   
+   2. **Minor Allele Frequency:** The minor allele frequency (MAF) echoes the less common allele frequency across the population. The MAF estimates tend to be more accurate for higher MAFs and the population sample size the MAF was based on. If there are too few samples representing the rare-allele, is hard to distinguish between a true rare-allele and sequencing errors.
+   
+   3. **Sample call rate:** Similar to SNP call rate, it allows to filter out all samples exceeding 98% missing genetic variants out of all the  calls. 
+   
+
+```{bash, eval=FALSE}
+
+## Using only one run of plink 1.9 (i.e. only calling plink1.9 once with multiple flags):
+## 1. Filter out -SNPs- with more than 5% missingness
+## 2. Filter out -variants- with less than 1% MAF
+## 3. Filter out -samples- with more than 2% missingness
+## 4. Create an output file in bfile format (which contains the bed, fam and bim files) for the MiniCohort QCed data
+
+#?# Type the command you used below: - 3pt
+
+plink --bfile /projects/bmeg/A7/Mini_cohort --geno 0.05 --mind 0.02 --maf 0.01 --make-bed --out Mini_cohort_QC
+
+```
+
+
+## Global Ancestry Investigation
+
+In order to enhance imputation accuracy when dealing with ethnically diverse cohorts is important to understand the genetic ancestries of the cohort's participants. Knowing the ancestral populations will ensure that the most closely related population is used as a reference for the imputation. For instance, one would not want to impute haplotypes of an individual of Yoruban ancestry with a population of East Asians because many of the haplotypes will differ between the two ancestries, leading to imputing the wrong variants for the Yoruban person. Hence, we will analyze the global ancestry of our cohort using Principal Component Analysis (PCA). PCA is an unsupervised, unbiased way to reduce the complexity of multidimensional.
+
+## a. PCA-specific QC
+
+We first need to ensure that only the most informative genetic variants are used in the analysis. To do this, we will: 
+
+   1. **Filter out high linkage disequilibrium (LD) regions:** Because high LD regions will add redundancy to the PCA (leading to these regions dominating top PCs), they need to be removed. 
+   
+   2. **LD pruning:** Similarly, LD causes redundancy even outside the particularly problematic high-LD regions. Thus, we will use LD-pruning to identify variants that are in LD, and select one per block.
+   
+```{bash, eval=FALSE}
+#?# Briefly explain what Linkage Disequilibrium is, and why it will cause problems for our analysis (PCA). - 2pts
+#Linkage disequilibrium is parameter that describes the degree to which an allele of one variant will be inherited or correlated with a allele of a variant that is nearby. It causes problems for our PCA analysis as it changes gene frequency and increases the level of homozygosity. 
+
+## Using only one run of plink 1.9 (with different flags)
+## 1. Filter out the high-LD regions contained in the --high_LD_regions_hg19.txt-- file, located in /projects/bmeg/A7/
+## 2. Use the --indep-pairwise to do LD prunning with the following parameters:
+## - Window size: 200, 
+## - Variant Count: 100 
+## - r^2: 0.2 
+#?# Type the command you use to create the Mini Cohort PCA-QCed bfile below: - 1pt
+ plink --bfile /projects/bmeg/A7/Mini_cohort --remove /projects/bmeg/A7/high_LD_regions_hg19.txt --indep-pairwise 200 100 0.2 --make-bed --out PCA_QC_data
+
+## Use the output -.prune.in- file to extract only the informative variants and create a new bfile format (bed, fam and bim files) from:
+## 1. The General MiniCohort QC bfile created before
+## 2. The 1KGP_reference bfile located in /projects/bmeg/A7/
+
+#?# Type the commands you used below: - 3pt
+
+plink --bfile /home/rdaswani_bmeg23/Assignment7/Mini_cohort_QC --extract PCA_QC_data.prune.in --make-bed --out general_QC_bfile
+
+plink --bfile /projects/bmeg/A7/1kgp_reference --extract PCA_QC_data.prune.in --make-bed --out 1kgp_reference_bfile
+
+
+
+```
+
+## b. PCA computation
+
+To assess the ethnic diversity in our cohort, we will use One-thousand Genome Project (1KGP) data as a reference for our PCA analysis. These dataset has genetic information of major continental populations: Admixed American (AMR), European (EU), Asian (AS) and African (A). 
+
+```{bash, eval=FALSE}
+
+## Merge your pruned bfiles of the Mini_cohort and the 1KGP created on the previous step 
+## Remember to create a new bfile (.fam, .bed and .bim files) that contains the merged data.
+## IMPORTANT TIME CONSTRAINT: This step can take ~15 minutes, so make sure to check the server status before you run it!
+#?# Type the command you used below: - 1pt
+plink --bfile general_QC_bfile --bmerge 1kgp_reference_bfile.bed 1kgp_reference_bfile.bim 1kgp_reference_bfile.fam --make-bed --out merged_minicohort_1kgp
+
+#?# Perform a PCA analysis in plink on the merged set - 1 pt
+plink --bfile merged_minicohort_1kgp --pca --out pca_analysis 
+
+```
+
+## c. Visualization
+
+```{r}
+
+## Copy the PCA .eigenvec file to your computer, together with the samples_info.txt located in /projects/bmeg/A7/
+#scp rdaswani_bmeg23@orca1.bcgsc.ca:/home/rdaswani_bmeg23/Assignment7/pca_analysis.eigenvec ~/Desktop/BMEG591-Assignments
+
+#scp rdaswani_bmeg23@orca1.bcgsc.ca:/projects/bmeg/A7/samples_info.txt ~/Desktop/BMEG591-Assignments
+
+## Load the .eigenvec file onto R, change the column names to: FID, IID, PC1, PC2, PC3, ..., PC20
+#?# Type the command you used below: - 1pt
+pcadf <- read.table("pca_analysis.eigenvec")
+
+colnames(pcadf) <- c("FID", "IID", "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9", "PC10", "PC11", "PC12", "PC13", "PC14", "PC15", "PC16", "PC17", "PC18", "PC19", "PC20")
+
+## Load the samples_info.txt file onto R, change the column names to: FID, IID, SuperPopulation, Population
+#?# Type the commands you used below: - 1pt
+samples_info <- read.table("samples_info.txt")
+colnames(samples_info) <- c("IID", "FID", "SuperPopulation", "Population")
+#The colnames didn't match up, so I switched the order, in order to make it match up. My understanding is that IID the individual ID starts with HG.. and the FID is either 0, 1 or 2. 
+
+## Merge the .eigenvec and sample_info data.frames together using the IID column
+## Tip: Look into the -merge- function!
+#?# Type the command you used below: - 1pt
+merged_df <- merge(pcadf, samples_info, by = "IID")
+
+## Using ggplot create a scatterplot, using: 
+## x-axis: PC1
+## y-axis: PC2
+## color: SuperPopulation - to use the Population information to color the samples and be able to appreciate population structure!
+#?# Type the command you used below: 1pt
+library(ggplot2)
+ggplot(merged_df, aes(x = PC1, y = PC2, color = SuperPopulation)) + geom_point()
+
+#?# Where do the cohort samples fall? Are they all clustered together? - 1 pt
+#Yes, they do seem to cluster together by the SuperPopulation around 0.01 of the pca plot. We see that some of the AFR population is slightly not clustered. 
+
+#?# Which Population would you use as a reference for imputation?, Why? - 1 pt
+#I would use the AMR population as it seems that the American cluster is surrounded by other clusters close by which would mean that when we infer the genotypes and data from the other populations, it would be most accurate than if we took AFR as our reference.  
+
+#?# Do you think looking at the top two PCs is sufficient to tell what population is best? Why/why not? - 2 pt
+#Yes, looking at the top two PCs should be sufficient as the top 2 have the most variance between each other and hence will be able to tell which population is the best. The variance between PC2 and PC3 or PC3 and PC4 is not that much. PC1 shows the most variation and PC2 shows the second most variation. This means that including PC3 and PC4 so on is not really required and we will be able to tell what the best population is from PC1 and PC2. 
+
+```
+
+# Imputation
+
+Imputation of genetic data is a very computationally intensive analysis, that can take a long time. So we have performed it for you. Using the chromosome 17 imputation information located in */projects/bmeg/A7/* under the *Mini_cohort_chr17_imputation_results.info.gz* we will calculate some post-imputation metrics. 
+
+```{r}
+## Load the Mini_cohort_chr17_imputation_results.info.gz file to your Rstudio environment 
+chr_info <- read.table(file = "Mini_cohort_chr17_imputation_results.info",
+                             header = TRUE)
+## Use the information in the file to answer the following questions. Accompany each of the answers with the code you used to get to them and a brief explanation of your thought process behind.
+#?# What is the percentage of imputed SNPs? 0.5 pt
+table(chr_info$Genotyped)
+(1336381/1345835)*100
+#99.29% of imputed SNPs 
+
+## The metric of imputation quality is Rsq, this is the estimated value of the squared correlation between imputed and true genotypes. Since true genotypes are not available, this calculation is based on the idea that poorly imputed genotype counts will shrink towards their expectations based on allele frequencies observed in the population (https://genome.sph.umich.edu/wiki/Minimac3_Info_File#Rsq).  An Rsq < 0.3 is often used to flag poorly imputed SNPs. 
+#?# What is the percentage of poorly imputed SNPs?
+library(dplyr)
+rsq0.3 <- filter(chr_info, Rsq < 0.3)
+(853438/1345835)*100
+#63.4% 
+
+#?# Create a histogram to visualize the distribution of the MAF - 1 pt
+ggplot(chr_info, aes(x = MAF)) + geom_histogram()
+
+#?# Which MAF is most frequent? What does that mean? - 1 pt
+MAF_freq <- dplyr::count(chr_info, MAF, sort = TRUE) 
+#The most frequent MAF is 0. This means that the major allele is really important as the second most allele that occurs in the population is zero. So it signifies that the population is homozygous with dominant allele.  
+
+#?# What is the maximum MAF? Why is that? - 1 pt
+max(chr_info$MAF) 
+#The maxiumum MAF is 0.5. This is because if it was any higher than 0.5 then it wouldn't be considered as the minor allele frequency, it would be the major allele frequency. 
+
+```
+
+# Polygenic Scores (PGS) 
+
+A GWAS for affinity for tapas (the Spanish appetizer) was performed and 199 SNPs were found significantly associated. The significant SNPs and their assigned effect sizes are described in the *Tapas_enjoyability_GWAS_sumStats.txt* file. Thanks to the imputation performed in our MiniCohort, we were able to obtain the dosages (double risk alleles=2, one risk allele=1, no risk alleles=0) for each one of the SNPs associated to the Tapas 'enjoyability', described in the *MiniCohort_Tapas_SNPdosages.txt*. 
+
+PGS are calculated by multiplying the effect sizes of each SNP by the dosage of an individual for those SNP and then adding together all the effectSize x dosage. The formula is outlined below, where:
+
+  - i: individual of which you are calculating the PGS
+  
+  - j: SNP that has been found to be associated to the trait (Tapas enjoyability in this case)
+
+  - Beta: Effect size
+
+  - dosage: number of risk alleles the *individual i* has of the *risk allele j*? (2,1 or 0)
+
+![](PGS_formula.png)
+
+```{r}
+
+## Load to your RStudio:
+## 1.  -Tapas_enjoyability_GWAS_sumStats.txt-
+## 2.  -MiniCohort_Tapas_SNPdosages.txt- 
+## Both are located in the A7 directory on github.
+#scp rdaswani_bmeg23@orca1.bcgsc.ca:/projects/bmeg/A7/MiniCohort_Tapas_SNPdosages.txt ~/Desktop/BMEG591-Assignments
+#scp rdaswani_bmeg23@orca1.bcgsc.ca:/projects/bmeg/A7/Tapas_enjoyability_GWAS_sumStats.txt ~/Desktop/BMEG591-Assignments
+
+tapas_SNPdosages <- read.table("MiniCohort_Tapas_SNPdosages.txt", header = TRUE)
+GWAS_sumStats <- read.table("Tapas_enjoyability_GWAS_sumStats.txt", header = TRUE)
+
+
+## Using the base PRS formula outlined below, calculate the Tapas enjoyability PGS for the individuals in the Mini Cohort 
+#?# Include your rationale and the code you used (document your code with comments!) - 5pt
+library(reshape2)
+library(tidyverse)
+library(data.table)
+tapas_SNPdosages_noenjoy <- subset(tapas_SNPdosages, select = -c(Tapas_enjoyability)) #Removing tapas enjoyability column so that we can move the SNPs as rows rather than coumns 
+melted_tapas_SNPdosages <- melt(tapas_SNPdosages_noenjoy)
+colnames(melted_tapas_SNPdosages) <- c("IID", "SNP", "value") #changing col names 
+transposed_tapas_SNPdosages <- melted_tapas_SNPdosages %>% pivot_wider(
+  names_from = IID, values_from = value) #pivoting the data in order to get variants as rows and the IDs as columns 
+
+merged_tapas_SNPdosages <- merge(transposed_tapas_SNPdosages, GWAS_sumStats, by = "SNP") #merging the two datasets, the SNP dosages and GWAS_sumStats which has the effect size so it is all in on dataset. 
+
+
+value <- as.list(tapas_SNPdosages$IID) #creating id names which will be the columns to be multiplied by beta 
+id_names <- unlist(value)
+new_id_names <- paste0("new_", id_names) #The names of the new column
+tapas_merged_table <- as.data.table(merged_tapas_SNPdosages) #converting to data table in order to complete the calculation below 
+tapas_merged_table[, (new_id_names) := .SD * Effect_Size, .SDcols = id_names] #the multiplication of the effect size by dosages 
+
+PRS <- tapas_merged_table[, colSums(.SD), .SDcols = new_id_names]
+PRS_df <- as.data.frame(PRS, header = TRUE) #convert it back to a data frame in order to plot 
+#?# Use ggplot to plot the distribution of the Tapas PGS: - 2 pt
+## Include the code and the graph in your analysis! 
+## Tip: http://www.cookbook-r.com/Graphs/Plotting_distributions_(ggplot2)/
+ 
+ggplot(PRS_df, aes(x = PRS)) + geom_histogram(aes(y=after_stat(density)),   
+                   binwidth=.5,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666")
+
+#?# What is the distribution of the tapas PGS? - 1pt
+#It seems to be some what normally distributed. Polygenic risk scores mostly show a normal distribution on a population level. Meaningful risk predictions can only be expected for extreme quantiles of the distribution.  
+
+```
+
+## PGS accuracy
+
+```{r}
+## The Tapas enjoyability was measured in a range of 0-1, with 0 being hating tapas and 1 being completely in love with tapas.
+## This tapas likability is captured in the "Tapas_enjoyability" column of the -MiniCohort_Tapas_SNPdosages.txt- file. 
+#?# Make a scatterplot with a linear regression line, where x is the Tapas-PGS and y is their actual Tapas enjoyability - 2 pt
+## Tip: http://www.sthda.com/english/wiki/ggplot2-scatter-plots-quick-start-guide-r-software-and-data-visualization
+
+PRS_df$Tapas_enjoyability <- tapas_SNPdosages$Tapas_enjoyability
+ggplot(PRS_df, aes(x = PRS, y = Tapas_enjoyability)) + geom_point() + geom_smooth(method = 'lm')
+
+#?# What is the correlation coefficient between the PGS and Tapas enjoyability? Is Spearman or Pearson correlation more appropriate here? Why? - 3 pt
+cor(PRS_df$PRS, PRS_df$Tapas_enjoyability, method = "spearman")
+#The correlation coefficient between PGS and Tapas enjoyability is 0.171456 through spearman. The spearman correlation coefficient is more appropriate here as we are not using raw data, it is based on ranked values e.g. polygenic risk scores. The spearman correlation is based on the ranked values for each variable rather than raw data. The spearman correlation is also used for data that is ordinal (not continuous) i.e. there is only 0, 1 or 2 which correlates to tapas enjoyability. Whereas pearson is used if you have continuous data. 
+
+#?# How predictive is the PGS for tapas preference? Include in your answer why do you think it is/isn't accurate and what could affect its predictivity - 2pt 
+#PGS for tapas preference is not that predictive/accurate because the correlation value is very low along with the very insignificant p values. Sample size can affect the predictivity as typically, we would need a larger sample size. In addition to this, PRS can lose predictive value outside of discovery ancestry. We see, even within a populatiooon, the prediction accuracy decreases. The predictivity capacity is correlated to how genetically related the populations are. 
+
+```
+
+# Using pgsc_calc pipeline for PRS calculation
+Now we are going to take a look at how the use of the pgsc_calc pipeline can simplify the above process. pgsc_calc calculates polygenic scores quickly using scoring files stored in the Polygenic Score (PGS) Catalog.
+
+## Installation and Setup
+
+First we have to install nextflow, we will be using conda to do this. 
+```{bash,eval=FALSE}
+## You will have to create a fresh conda environment in order to install nextflow correctly.
+#?# Create a new conda environment called nextflow. Type the command you used below - 0.5 pts
+conda create -n nextflow
+
+## You will then have to ensure you have the correct channels loaded in the right order. Type each of the following commands into your terminal:
+# conda config --add channel defaults
+# conda config --add channel bioconda
+# conda config --add channel conda-forge
+# conda config --set channel_priority strict
+
+#This should say 'channels' not 'channel' 
+
+## Type the following command into your terminal:
+# conda config --show channels 
+#?# Paste the output below - 0.5 pts
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+#?# Install nextflow into your anaconda environment and type the command you used below - 1 pt
+conda install -c bioconda nextflow
+
+```
+
+Now that we have installed nextflow we have to ensure it is working correctly:
+```{bash, eval=FALSE}
+## Type the following commands into your terminal:
+
+# nextflow run pgscatalog/pgsc_calc --help
+# nextflow run pgscatalog/pgsc_calc -profile test,conda
+
+## You should not have any errors or exceptions raised. If you see 
+## -[pgscatalog/pgsc_calc] Pipeline completed successfully-
+## you know everything has run successfully.
+## If you encounter any errors at this point please let us know ASAP.
+```
+
+## Calculating Risk Scores
+First we need to find genomic data from a patient. For this assignment we will be using data sourced from the Harvard Personal Genomics Project (PGP) which can be found at https://my.pgp-hms.org/. We have stored the selected files in plink's bfile format at /projects/bmeg/A7/patient3.{bed/bim/fam} and /projects/bmeg/A7/patient6.{bed/bim/fam}. 
+
+```{bash,eval=FALSE}
+## pgsc_calc does not take VCF or bfiles directly as input, but rather a samplesheet csv file which lists all of the data sets we wish to calculate scores for. 
+#?# Generate an appropriate sample sheet for the VCF files located in the projects/bmeg/A7 directory - 2 pts
+# An example of a valid samplesheet file would be :
+#used vim to create a samplesheet as below: 
+
+#sampleset,vcf_path,bfile_path,pfile_path,chrom
+#patient3,,/projects/bmeg/A7/patient3_axy
+#patient6,/projects/bmeg/A7/patient6.vcf.gz
+
+# Tip: https://pgsc-calc.readthedocs.io/en/latest/how-to/prepare.html
+
+```
+
+Now that we have our sample sheet set up, we need to find our other input to pgsc_calc; the scoring files. The scoring files used by pgsc_calc come from the Polygenic Score (PGS) catalog and contain variant associations/effect sizes determined through GWAS. This large public repository makes things much easier for researchers like us. 
+
+The PGS catalog groups all score files associated with a particular trait under a specific EFO id. The EFO id we will be using today is MONDO_0008315.
+```{bash, eval=FALSE}
+#?# Search for the efo id listed on the PGS catalog. What trait are these score files for? - 1 pt
+#Prostrate cancer/prostrate carcinoma is what these score files are for. 
+
+## Type the following command to use pgsc_calc to calculate polygenic risk scores for both patients and all of the scoring files under MONDO_0008315 at once.
+# nextflow run pgscatalog/pgsc_calc -profile conda \
+# --input samplesheet_bfile_p36.csv --target_build GRCh37 \
+# --trait_efo MONDO_0008315 --min_overlap 0.45
+nextflow run pgscatalog/pgsc_calc -profile conda --input samplesheet_bfile_p36.csv --target_build GRCh37 --trait_efo MONDO_0008315 --min_overlap 0.45
+## Copy the files generated to your local computer for analysis. 
+
+#?# Examine the report generated by pgsc_calc. Also look at the aggregated_scores.txt.gz (remember to unzip the file!). Summarize the results for both patients with regards to both conditions. - 4 pts
+#The first column of the aggregate scores txt file is the sampleset showing patient 3 and 6, followed by the sample IID and DENOM which is the denominator used for score average. In addition, the had columns with giving the [PGS]_sum which is the weighted sum of the effect_allele dosages multiplied by the effect_weight. Since we calculated PGS on a dataset, we also have [PGS]_avg which normalizes the PGS using the number of non-missing genotypes. We will be focusing on the [PGS]_avg values for both the patients. There was a total of 30 scores processed for the 2 samples with some missing scores due to failed matching. We notice that patient 3 had higher scores overall compared to patient 6 for each of the scoring files (avg). In addition, We also noticed that patient 3 matched with more variants from the reference genome, leading us to believe that patient 3 might have more traits that can lead to the development of prostrate cancer as they had more traits that matched to the reference. For examples for the scoring file PGS000714_hmPOS_GRCh37_AVG, patient 3's value is 1.62E-06 and patient 6 is 5.96E-07. 
+
+#?# Can you say with certainty which patient is at higher risk for the condition/trait scored? Why/why not? - 2 pts
+#You are unable to tell with certainty which patient is at higher risk for prostrate cancer, which patient 3 shows to have higher scores compared to patient 6, the difference for some of the scoring files is very small. 
+
+#?# If we were to repeat this analysis with five different traits, would we be able to use the scores generated to say which traits patient 1 is at highest risk for? Why or why not? - 2 pts
+#No, because we do not have information with regards to the PGS for the different variants for patient 1. Each PGS is specific to an individual. 
+
+
+```
+
+# References 
+https://pgsc-calc.readthedocs.io/en/v1.1.0/output.html 
+https://blog.bioturing.com/2018/06/14/principal-component-analysis-explained-simply/#:~:text=PC1%20reveals%20the%20most%20variation,looking%20distances%20along%20PC2%20axis. 
+https://sahirbhatnagar.com/blog/2017/08/11/polygenic-risks-scores-with-data.table-in-r/ 
+https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4975612/ 
+
+# Authors and contributions
+
+Following completion of your assignment, please fill out this section with the authors and their contributions to the assignment.  If you worked alone, only the author (e.g. your name and student ID) should be included.
+
+Authors: Rishika Daswani (59028654) and Stephanie Besiou (12184982)
+
+Contributions: (example) N1 and N2 worked together on the same computer to complete the assignment. N1 typed for the first half and N2 typed for the second half. 
+
+
