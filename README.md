@@ -8,3 +8,4 @@ This repository contains the Assignments for BMEG591 (Genome Informatics).
 * Assignment 4 - 13/02/2023
 * Assignmennt 5 - 20/02/2023
 * Assignment 6 - 06/03/2023
+* Assignment 7 - 13/03/2023
